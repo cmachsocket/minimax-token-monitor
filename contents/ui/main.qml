@@ -18,6 +18,10 @@ PlasmoidItem {
     // the property always matches what the UI shows ("usage : X%").
     property int usagePercent: 0
 
+    // "Resets in 2h41m @ 00:00" — formatted from API `remains_time` + `end_time`.
+    // Populated only after the first successful fetch; "—" before that.
+    property string nextResetLabel: "—"
+
     property string lastUpdated: "N/A"
     property string errorMessage: ""
     property bool isLoading: false
@@ -91,6 +95,12 @@ PlasmoidItem {
                         }
                     }
                 }
+                QtControls.Label {
+                    QtLayouts.Layout.alignment: Qt.AlignCenter
+                    font.pixelSize: 12
+                    color: subtextColor
+                    text: "Resets in " + nextResetLabel
+                }
                 QtControls.Button {
 
                     QtLayouts.Layout.alignment: Qt.AlignCenter
@@ -106,6 +116,19 @@ PlasmoidItem {
     }
 
     Component.onCompleted: fetchData()
+
+    // milliseconds → "XhYm" / "Xm" (or "—" for invalid input).
+    // API uses ms since epoch for `end_time`/`weekly_end_time` but RELATIVE
+    // milliseconds for `remains_time`/`weekly_remains_time`. formatDuration
+    // operates on the relative kind (counting down to a near-future moment).
+    function formatDuration(ms) {
+        if (typeof ms !== "number" || ms < 0) return "—";
+        var totalSec = Math.floor(ms / 1000);
+        var h = Math.floor(totalSec / 3600);
+        var m = Math.floor((totalSec % 3600) / 60);
+        if (h > 0) return h + "h" + m + "m";
+        return m + "m";
+    }
 
     function fetchData() {
         isLoading = true;
@@ -138,6 +161,13 @@ PlasmoidItem {
                                     var remainingPct = m.current_interval_remaining_percent;
                                     var remaining = (typeof remainingPct === "number") ? remainingPct : 100;
                                     usedPct = 100 - remaining;
+
+                                    // "next reset" combines API `remains_time` (ms until
+                                    // reset) with `end_time` (absolute epoch ms → HH:mm).
+                                    if (typeof m.remains_time === "number" && typeof m.end_time === "number") {
+                                        root.nextResetLabel = formatDuration(m.remains_time)
+                                            + " @ " + Qt.formatDateTime(new Date(m.end_time), "HH:mm");
+                                    }
                                     break;
                                 }
                             }
