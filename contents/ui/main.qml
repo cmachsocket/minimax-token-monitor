@@ -13,12 +13,14 @@ PlasmoidItem {
     Plasmoid.backgroundHints: PlasmaCore.Types.NoBackground
     preferredRepresentation: compactRepresentation
 
-    property string usageRatio: "0%"
+    // Percent of quota already consumed (0 = nothing used, 100 = exhausted).
+    // Source: API field `current_interval_remaining_percent` is inverted here so
+    // the property always matches what the UI shows ("usage : X%").
+    property int usagePercent: 0
+
     property string lastUpdated: "N/A"
     property string errorMessage: ""
     property bool isLoading: false
-    property string getTotal : ""
-    property string getUsage : ""
 
     // Colors
     readonly property string barColor: "#00D1B2"
@@ -38,7 +40,7 @@ PlasmoidItem {
             QtControls.Label {
                 QtLayouts.Layout.alignment: Qt.AlignCenter
                 horizontalAlignment: Text.AlignHCenter
-                text: usageRatio
+                text: usagePercent + "%"
                 font.pixelSize: 14
                 font.bold: true
                 color: textColor
@@ -61,7 +63,7 @@ PlasmoidItem {
 
                     QtLayouts.Layout.alignment: Qt.AlignCenter
                     horizontalAlignment: Text.AlignHCenter
-                    text : "usage : " + (getTotal-getUsage) + "/" + getTotal
+                    text : "usage : " + usagePercent + "% / 100%"
                 }
                 QtControls.ProgressBar{
                     id : progress
@@ -69,8 +71,8 @@ PlasmoidItem {
                     implicitHeight: 20
                     padding: 0
                     from: 0
-                    to: getTotal
-                    value: (getTotal-getUsage)
+                    to: 100
+                    value: usagePercent          // green = used, grows with consumption
                     background: Rectangle {
                         implicitHeight: 20
                         color: bgColor
@@ -115,7 +117,7 @@ PlasmoidItem {
         }
 
         var xhr = new XMLHttpRequest();
-        xhr.open("GET", "https://www.minimaxi.com/v1/api/openplatform/coding_plan/remains", true);
+        xhr.open("GET", "https://www.minimaxi.com/v1/token_plan/remains", true);
         xhr.setRequestHeader("Authorization", "Bearer " + config_apiKey);
 
         xhr.onreadystatechange = function () {
@@ -127,21 +129,19 @@ PlasmoidItem {
                     try {
                         var resp = JSON.parse(xhr.responseText);
                         if (resp.model_remains) {
-                            var ratio = "0%";
+                            var usedPct = 0;
                             for (var i = 0; i < resp.model_remains.length; i++) {
                                 var m = resp.model_remains[i];
-                                if (m.model_name && m.model_name.startsWith("MiniMax-M")) {
-                                    var total = m.current_interval_total_count;
-                                    var used = m.current_interval_usage_count;
-                                    if (total > 0) {
-                                        ratio = (100-Math.round(used / total * 100)) + "%";
-                                    }
+                                // "general" = aggregate LLM token quota
+                                // (API no longer exposes MiniMax-M* family names)
+                                if (m.model_name === "general") {
+                                    var remainingPct = m.current_interval_remaining_percent;
+                                    var remaining = (typeof remainingPct === "number") ? remainingPct : 100;
+                                    usedPct = 100 - remaining;
                                     break;
                                 }
                             }
-                            usageRatio = ratio;
-                            getTotal = total;
-                            getUsage = used;
+                            root.usagePercent = usedPct;
                         }
                     } catch (e) {
                         errorMessage = "Parse error";
@@ -172,10 +172,8 @@ PlasmoidItem {
     function demoData() {
         var now = new Date();
         lastUpdated = now.toLocaleTimeString(Qt.locale(), "HH:mm");
-        usageRatio = Math.floor(Math.random() * 60 + 20) + "%";
+        root.usagePercent = Math.floor(Math.random() * 60 + 20);
         isLoading = false;
-        getTotal = 1000;
-        getUsage = Math.floor(Math.random() * 800);
     }
 
 }
