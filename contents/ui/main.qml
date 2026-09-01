@@ -4,7 +4,7 @@ import QtQuick.Controls as QtControls
 import org.kde.plasma.core as PlasmaCore
 import org.kde.plasma.extras as PlasmaExtras
 import org.kde.plasma.plasmoid
-
+pragma ComponentBehavior: Bound   // 静态作用域解析
 PlasmoidItem {
     id: root
     readonly property string config_apiKey: Plasmoid.configuration.apiKey || ""
@@ -44,16 +44,16 @@ PlasmoidItem {
             QtControls.Label {
                 QtLayouts.Layout.alignment: Qt.AlignCenter
                 horizontalAlignment: Text.AlignHCenter
-                text: usagePercent + "%"
+                text: root.usagePercent + "%"
                 font.pixelSize: 14
                 font.bold: true
-                color: textColor
+                color: root.textColor
             }
 
             Timer {
-                interval: config_refreshInterval * 1000
+                interval: root.config_refreshInterval * 1000
                 repeat: true
-                onTriggered: fetchData()
+                onTriggered: root.fetchData()
             }
         }
     }
@@ -67,7 +67,7 @@ PlasmoidItem {
 
                     QtLayouts.Layout.alignment: Qt.AlignCenter
                     horizontalAlignment: Text.AlignHCenter
-                    text : "usage : " + usagePercent + "% / 100%"
+                    text : "usage : " + root.usagePercent + "% / 100%"
                 }
                 QtControls.ProgressBar{
                     id : progress
@@ -76,10 +76,10 @@ PlasmoidItem {
                     padding: 0
                     from: 0
                     to: 100
-                    value: usagePercent          // green = used, grows with consumption
+                    value: root.usagePercent          // green = used, grows with consumption
                     background: Rectangle {
                         implicitHeight: 20
-                        color: bgColor
+                        color: root.bgColor
                         radius: 3
                     }
 
@@ -90,7 +90,7 @@ PlasmoidItem {
                         Rectangle {
                             width: progress.visualPosition * parent.width
                             height: parent.height
-                            color: barColor
+                            color: root.barColor
                             radius: 3
                         }
                     }
@@ -98,8 +98,8 @@ PlasmoidItem {
                 QtControls.Label {
                     QtLayouts.Layout.alignment: Qt.AlignCenter
                     font.pixelSize: 12
-                    color: subtextColor
-                    text: "Resets in " + nextResetLabel
+                    color: root.subtextColor
+                    text: "Resets in " + root.nextResetLabel
                 }
                 QtControls.Button {
 
@@ -145,21 +145,21 @@ PlasmoidItem {
 
         xhr.onreadystatechange = function () {
             if (xhr.readyState === XMLHttpRequest.DONE) {
-                var now = new Date();
+                let now = new Date();
                 lastUpdated = now.toLocaleTimeString(Qt.locale(), "HH:mm");
 
                 if (xhr.status === 200) {
                     try {
-                        var resp = JSON.parse(xhr.responseText);
+                        let resp = JSON.parse(xhr.responseText);
                         if (resp.model_remains) {
-                            var usedPct = 0;
-                            for (var i = 0; i < resp.model_remains.length; i++) {
-                                var m = resp.model_remains[i];
+                            let usedPct = 0;
+                            for (let i = 0; i < resp.model_remains.length; i++) {
+                                let m = resp.model_remains[i];
                                 // "general" = aggregate LLM token quota
                                 // (API no longer exposes MiniMax-M* family names)
                                 if (m.model_name === "general") {
-                                    var remainingPct = m.current_interval_remaining_percent;
-                                    var remaining = (typeof remainingPct === "number") ? remainingPct : 100;
+                                    let remainingPct = m.current_interval_remaining_percent;
+                                    let remaining = (typeof remainingPct === "number") ? remainingPct : 100;
                                     usedPct = 100 - remaining;
 
                                     // "next reset" combines API `remains_time` (ms until
