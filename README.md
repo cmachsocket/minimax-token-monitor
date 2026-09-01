@@ -18,7 +18,17 @@ minmax 额度查看器
 
 执行安装后额外启动一个预览程序
 
-## 一键安装
+## 安装
+
+### AUR
+
+现已添加至aur大礼包
+
+```
+yay -S minimax-token-monitor
+```
+
+### 手动安装
 
 ```
 git clone https://github.com/cmachsocket/minmax-token-monitor.git

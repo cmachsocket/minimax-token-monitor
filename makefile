@@ -1,5 +1,5 @@
 
-NAME := org.kde.plasma.minmax-token-monitor
+NAME := org.kde.plasma.minimax-token-monitor
 INSTALL_DIR := $(HOME)/.local/share/plasma/plasmoids/$(NAME)
 
 install: clean
