@@ -17,6 +17,7 @@ PlasmoidItem {
     // Source: API field `current_interval_remaining_percent` is inverted here so
     // the property always matches what the UI shows ("usage : X%").
     property int usagePercent: 0
+    property int weeklyUsagePercent: 0
 
     // "Resets in 2h41m @ 00:00" — formatted from API `remains_time` + `end_time`.
     // Populated only after the first successful fetch; "—" before that.
@@ -31,6 +32,19 @@ PlasmoidItem {
     readonly property string bgColor: "#2D2D44"
     readonly property string textColor: "#FFFFFF"
     readonly property string subtextColor: "#A0A0A0"
+
+    // Timer must live on the root PlasmoidItem, not inside a representation.
+    // When the plasmoid expands, the compactRepresentation is hidden and any
+    // Timer inside it stops firing. Running it on the root keeps it alive in
+    // both compact and expanded states, and across panel/popup changes.
+    Timer {
+        id: refreshTimer
+        interval: root.config_refreshInterval * 1000
+        repeat: true
+        running: true
+        triggeredOnStart: false
+        onTriggered: root.fetchData()
+    }
 
     compactRepresentation: MouseArea {
         property bool wasExpanded
@@ -49,12 +63,6 @@ PlasmoidItem {
                 font.bold: true
                 color: root.textColor
             }
-
-            Timer {
-                interval: root.config_refreshInterval * 1000
-                repeat: true
-                onTriggered: root.fetchData()
-            }
         }
     }
 
@@ -69,6 +77,7 @@ PlasmoidItem {
                     horizontalAlignment: Text.AlignHCenter
                     text : "usage : " + root.usagePercent + "% / 100%"
                 }
+                
                 QtControls.ProgressBar{
                     id : progress
                     QtLayouts.Layout.alignment: Qt.AlignCenter
@@ -95,11 +104,16 @@ PlasmoidItem {
                         }
                     }
                 }
+                QtControls.Label{
+                    QtLayouts.Layout.alignment: Qt.AlignCenter
+                    horizontalAlignment: Text.AlignHCenter
+                    text : "weekly usage : " + root.weeklyUsagePercent + "% / 100%"
+                }
                 QtControls.Label {
                     QtLayouts.Layout.alignment: Qt.AlignCenter
                     font.pixelSize: 12
                     color: root.subtextColor
-                    text: "Resets in " + root.nextResetLabel
+                    text: "Interval resets in " + root.nextResetLabel
                 }
                 QtControls.Button {
 
@@ -159,8 +173,11 @@ PlasmoidItem {
                                 // (API no longer exposes MiniMax-M* family names)
                                 if (m.model_name === "general") {
                                     let remainingPct = m.current_interval_remaining_percent;
+                                    let remainingWeeklyPct = m.current_weekly_remaining_percent;
                                     let remaining = (typeof remainingPct === "number") ? remainingPct : 100;
+                                    let remainingWeekly = (typeof remainingWeeklyPct === "number") ? remainingWeeklyPct : 100;
                                     usedPct = 100 - remaining;
+                                    usedWeeklyPct = 100 - remainingWeekly;
 
                                     // "next reset" combines API `remains_time` (ms until
                                     // reset) with `end_time` (absolute epoch ms → HH:mm).
@@ -172,6 +189,7 @@ PlasmoidItem {
                                 }
                             }
                             root.usagePercent = usedPct;
+                            root.weeklyUsagePercent = usedWeeklyPct;
                         }
                     } catch (e) {
                         errorMessage = "Parse error";
@@ -203,6 +221,7 @@ PlasmoidItem {
         var now = new Date();
         lastUpdated = now.toLocaleTimeString(Qt.locale(), "HH:mm");
         root.usagePercent = Math.floor(Math.random() * 60 + 20);
+        root.weeklyUsagePercent = Math.floor(Math.random() * 60 + 20);
         isLoading = false;
     }
 
