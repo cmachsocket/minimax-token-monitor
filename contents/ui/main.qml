@@ -18,6 +18,8 @@ PlasmoidItem {
     // the property always matches what the UI shows ("usage : X%").
     property int usagePercent: 0
     property int weeklyUsagePercent: 0
+    property bool isWeeklyUsageAvailable: true
+    property bool isDemoData: false
 
     // "Resets in 2h41m @ 00:00" — formatted from API `remains_time` + `end_time`.
     // Populated only after the first successful fetch; "—" before that.
@@ -108,12 +110,21 @@ PlasmoidItem {
                     QtLayouts.Layout.alignment: Qt.AlignCenter
                     horizontalAlignment: Text.AlignHCenter
                     text : "weekly usage : " + root.weeklyUsagePercent + "% / 100%"
+                    visible: root.isWeeklyUsageAvailable
                 }
                 QtControls.Label {
                     QtLayouts.Layout.alignment: Qt.AlignCenter
                     font.pixelSize: 12
                     color: root.subtextColor
                     text: "Interval resets in " + root.nextResetLabel
+                    visible: !root.isDemoData
+                }
+                QtControls.Label {
+                    QtLayouts.Layout.alignment: Qt.AlignCenter
+                    font.pixelSize: 12
+                    color: "yellow"
+                    text: "Warning: Using demo data due to some error"
+                    visible: root.isDemoData
                 }
                 QtControls.Button {
 
@@ -167,6 +178,7 @@ PlasmoidItem {
                         let resp = JSON.parse(xhr.responseText);
                         if (resp.model_remains) {
                             let usedPct = 0;
+                            let usedWeeklyPct = 0;
                             for (let i = 0; i < resp.model_remains.length; i++) {
                                 let m = resp.model_remains[i];
                                 // "general" = aggregate LLM token quota
@@ -185,18 +197,26 @@ PlasmoidItem {
                                         root.nextResetLabel = formatDuration(m.remains_time)
                                             + " @ " + Qt.formatDateTime(new Date(m.end_time), "HH:mm");
                                     }
+                                    if (m.current_weekly_total_count === 0) {
+                                        root.isWeeklyUsageAvailable = false; //debug
+                                    } else {
+                                        root.isWeeklyUsageAvailable = true;
+                                    }
                                     break;
                                 }
                             }
                             root.usagePercent = usedPct;
                             root.weeklyUsagePercent = usedWeeklyPct;
+                            isDemoData = false;
                         }
                     } catch (e) {
                         errorMessage = "Parse error";
+                        console.error("Failed to parse API response:", e);
                         demoData();
                     }
                 } else {
                     errorMessage = "API Error";
+                    console.error("API request failed with status", xhr.status, "and response:", xhr.responseText);
                     demoData();
                 }
                 isLoading = false;
@@ -205,6 +225,7 @@ PlasmoidItem {
 
         xhr.onerror = function () {
             errorMessage = "Network error";
+            console.error("Network error occurred");
             demoData();
             isLoading = false;
         };
@@ -218,6 +239,8 @@ PlasmoidItem {
     }
 
     function demoData() {
+        isDemoData = true;
+        console.warn("Using demo data due to missing API key or error");
         var now = new Date();
         lastUpdated = now.toLocaleTimeString(Qt.locale(), "HH:mm");
         root.usagePercent = Math.floor(Math.random() * 60 + 20);
